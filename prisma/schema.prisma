@@ -26,6 +26,7 @@ model User {
   reviewsReceived                              Review[]          @relation("ReviewsForWorker")
   transactions                                 Transaction[]
   workerProfile                                WorkerProfile?
+  workerReviewSummary                          WorkerReviewSummary?
 }
 
 model WorkerProfile {
@@ -53,6 +54,17 @@ model WorkerProfile {
   previousWorks   PreviousWork[]
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   embedding       WorkerEmbedding?
+}
+
+// AI-written summary of a worker's reviews, shown on worker cards.
+// Kept in its own table so the app works before the migration is applied.
+model WorkerReviewSummary {
+  workerId    String   @id
+  summary     String
+  tags        String[] @default([])
+  reviewCount Int
+  updatedAt   DateTime @default(now())
+  worker      User     @relation(fields: [workerId], references: [id], onDelete: Cascade)
 }
 
 // Semantic-search vector for a worker. Written and queried with raw SQL
