@@ -113,7 +113,7 @@ tests/ai/
    - `getQuote` computes the price.
 6. The bot asks only for missing info, one question at a time, with quick-reply chips.
 7. A confirmation card shows the worker, slot, address, and price.
-8. The user taps **Confirm Booking** and `createBooking` runs. It creates a `PENDING` job through the existing `createJob`.
+8. The user taps **Confirm Booking** and the card posts to the existing `/api/jobs`, which creates a `PENDING` job through `createJob`. The model has no tool that creates bookings.
 9. The user gets a booking confirmation. The worker sees the job as usual, and payment stays in the existing completion flow.
 10. `getBookingStatus` handles follow-ups such as "Where's my worker?"
 

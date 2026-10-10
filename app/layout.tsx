@@ -16,6 +16,7 @@ import {
 } from "@clerk/nextjs";
 import { Toaster } from "sonner";
 import ConditionalFooter from "@/components/conditional-footer";
+import ChatMount from "@/components/ai-chat/chat-mount";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 
@@ -96,6 +97,7 @@ export default function RootLayout({
               <ConditionalHeader />
               <main className="min-h-screen">{children}</main>
               <Toaster richColors />
+              <ChatMount />
               {/* Conditional footer - hidden on customer/worker dashboards */}
               <ConditionalFooter />
             </ThemeProvider>
