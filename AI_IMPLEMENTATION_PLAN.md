@@ -2,13 +2,18 @@
 
 An open-source, free-tier-friendly AI layer for RozgaarSetu. Customers can find, quote, confirm, and pay for a worker from chat, in English, Hindi, and Marathi.
 
-> **Status:** In progress. Phase 0 is done and the plan is adjusted to the real code.
+> **Status:** All phases (0-6) are implemented on `feat/ai-assistant`. Automated checks pass (type-check, lint, tests, production build). The items under "Needs a person with credentials" in section 9 have **not** been run yet.
 >
 > **Findings from Phase 0**
-> - Payment happens at job **completion** (`initiatePaymentForJobCompletion`), not at booking. Chat therefore creates a `PENDING` job through `createJob`, and the existing payment flow is unchanged.
-> - Existing reusable logic: `searchWorkers` and `createJob` (`lib/services`), `canCreateJob` (`lib/access`), `protectCustomerApi` (`lib/api-auth`), `sendSuccess`/`sendError` (`lib/api-response`), and `checkRateLimit` (`lib/rate-limit`).
+> - Payment happens at job **completion** (`initiatePaymentForJobCompletion`), not at booking. Chat therefore creates a `PENDING` job through the existing `/api/jobs`, and the payment flow is unchanged.
 > - Pricing inputs already exist: `WorkerProfile.hourlyRate` and `minimumFee`. Address comes from `CustomerProfile`.
-> - The existing rate limiter is in-memory and IP-based, so AI routes use a small per-user wrapper around it. Upstash is optional later.
+> - The existing rate limiter is in-memory and IP-based, so AI routes use a small per-user limiter (`lib/ai/rate-limit.ts`).
+>
+> **Differences from the first draft of this plan**
+> - The model has **no** `createBooking` tool. `prepareBooking` only returns a draft; the **Confirm Booking** button posts to `/api/jobs`.
+> - Embeddings and review summaries live in **separate tables** (`WorkerEmbedding`, `WorkerReviewSummary`), not columns on `WorkerProfile`. This keeps the raw `wp.*` search query safe and means the app works even if a migration has not been applied yet.
+> - Smart pricing is statistics only (quartiles of completed job charges), with no LLM and no XGBoost.
+> - Upstash Redis and Langfuse were left out; they can be added later.
 
 ---
 
@@ -37,8 +42,8 @@ An open-source, free-tier-friendly AI layer for RozgaarSetu. Customers can find,
 | Orchestration | **Vercel AI SDK** (streaming and tool-calling) |
 | Embeddings | **bge-m3** via Hugging Face or Cloudflare Workers AI free tier |
 | Vector search | **pgvector** on the existing Postgres (Neon or Supabase) |
-| Rate limiting | **Upstash Redis** free tier |
-| Monitoring (optional) | **Langfuse** |
+| Rate limiting | In-memory per-user limiter (Upstash Redis is an optional upgrade, not used yet) |
+| Monitoring | Not added yet (Langfuse is an option) |
 
 > Ollama is for local development only. Vercel serverless functions cannot reach a local machine.
 
@@ -74,30 +79,33 @@ Switching providers or models means changing these values and redeploying. No co
 - Free-tier limits and model availability change, so verify them before launch.
 - Changing the embedding model requires re-embedding all workers, because vectors are not compatible across models.
 
-## 5. Target Structure (new files only)
+## 5. Structure (new files only)
 
 ```
 lib/ai/
-  provider.ts        # configurable LLM + fallback client
-  rate-limit.ts      # per-user limits
-  schemas.ts         # Zod schemas
-  tools/
-    search-workers.ts
-    get-quote.ts
-    create-booking.ts
-    get-booking-status.ts
-  embeddings.ts
-  review-summary.ts
-  pricing.ts
-app/api/ai/
-  chat/route.ts      # streaming chat endpoint
-  health/route.ts
-components/ai-chat/
-  chat-widget.tsx
-  worker-card.tsx
-  confirm-card.tsx
-scripts/
-  backfill-embeddings.ts
+  config.ts              # reads and validates AI env, feature flag
+  provider.ts            # OpenAI-compatible client with fallback
+  guard.ts               # flag + Clerk auth + per-user rate limit
+  rate-limit.ts
+  background.ts          # run work after the response (after())
+  prompt.ts              # chat system prompt
+  quote.ts               # worker rate -> quote
+  booking-draft.ts       # draft validation
+  pricing.ts             # pure price maths and badge (browser-safe)
+  market-price.ts        # typical price from completed jobs
+  embedding-utils.ts     # worker text, hash, vector literal (shared with the script)
+  embeddings.ts          # embed and store worker vectors
+  vector-search.ts       # pgvector similarity query
+  worker-search.ts       # semantic + keyword search for the chat
+  review-summary-utils.ts / review-summary.ts
+  tools/                 # searchWorkers, getQuote, + index.ts (address, prepareBooking, status)
+app/api/ai/chat/         # streaming chat endpoint
+app/api/ai/health/       # model health check
+app/api/pricing/         # typical price lookup
+components/ai-chat/      # chat-widget, worker-card, confirm-card, chat-mount
+components/review-summary.tsx, components/price-insight.tsx
+prisma/migrations/       # *_add_worker_embedding, *_add_review_summary
+scripts/backfill-embeddings.mjs
 tests/ai/
 ```
 
@@ -177,15 +185,34 @@ tests/ai/
 
 ## 9. Release Checklist
 
-- [ ] `AI_ENABLED=false` leaves the app behaving exactly as before
-- [ ] Lint, tests, and build pass
-- [ ] Migrations are additive and nullable, and have been tested on a copy of the database
-- [ ] The tool-calling model has been verified against the booking flow
-- [ ] Booking from chat matches the normal booking (address, price, payment)
-- [ ] Fallback provider works when the primary is rate-limited
-- [ ] Keyword search fallback works when vector search fails
-- [ ] Rate limiting is verified
-- [ ] Preview deployment is tested before production
+**Verified by automated checks**
+- [x] With `AI_ENABLED` unset the widget does not render and AI routes return 404; no AI query runs on existing pages
+- [x] Type-check, lint (no errors), 138 unit tests and the production build pass
+- [x] Migrations are additive: two new tables, no change to existing tables
+- [x] The model cannot create bookings (no such tool; booking goes through `/api/jobs`)
+- [x] Tools only read data for the signed-in user (booking status is scoped to the customer)
+- [x] Fallback model is used on 429, 5xx and network errors; client errors are not retried
+- [x] Semantic search, review summaries and price lookups all fall back quietly when unavailable
+- [x] Review text is treated as untrusted data; summaries are length-limited and reject links and phone numbers
+
+**Needs a person with credentials (not yet run)**
+- [ ] Apply the two migrations to a **dev** database (needs pgvector), then run `npm run ai:backfill-embeddings`
+- [ ] Confirm the chosen model really supports tool calling by completing one booking from chat end to end
+- [ ] Compare a chat booking with a normal booking (address, price, job appears for the worker)
+- [ ] Try Hindi and Marathi queries and tune `MIN_SIMILARITY` in `lib/ai/vector-search.ts` if results are too loose or strict
+- [ ] Check review summary quality with real reviews
+- [ ] Replace the placeholder estimate ranges in `lib/ai/pricing.ts` (`SEED_RANGES`) with real numbers, or remove them
+- [ ] Verify the fallback provider by forcing a failure on the primary
+- [ ] Deploy to a Vercel preview with `AI_ENABLED=true`, then production
+
+## Known limitations
+
+- Rate limits are per server instance (in memory). Use a shared store such as Upstash if abuse becomes a concern.
+- Free LLM tiers have request quotas, and model availability changes. Keep a fallback configured.
+- Worker-written text (name, skills) reaches the model through search results. The model cannot book on its own, so the worst case is a misleading draft that the customer still has to confirm, but it is worth monitoring.
+- Price ranges are quartiles of whole-job charges, so they are wide for mixed job sizes. The badge needs 5+ completed jobs for the skill.
+- The 1024-dimension embedding column fits `bge-m3`. A different dimension needs a new migration.
+- Applying the embedding migration requires pgvector on the database; `prisma migrate deploy` will fail on databases without it.
 
 ## 10. Later Extras (out of scope)
 
