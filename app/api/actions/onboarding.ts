@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { scheduleEmbeddingRefresh } from "@/lib/ai/embeddings";
 
 export type WorkerFormData = {
   skilledIn: string[];
@@ -226,7 +227,7 @@ export async function setUserRole(
           : {}),
       };
 
-      await prisma.$transaction([
+      const [, savedProfile] = await prisma.$transaction([
         prisma.user.update({
           where: { clerkUserId: userId },
           data: { role: "WORKER" },
@@ -237,6 +238,8 @@ export async function setUserRole(
           create: { userId: user.id, ...profileData },
         }),
       ]);
+
+      scheduleEmbeddingRefresh(savedProfile.id);
 
       // Handle previous works if any
       if (previousWorks.length > 0) {

@@ -10,6 +10,9 @@ const prismaMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
+// Vector search is covered in worker-search.test.ts; keep it off here.
+vi.mock("@/lib/ai/vector-search", () => ({ semanticWorkerIds: vi.fn().mockResolvedValue([]) }));
+
 const searchMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/services/worker-service", () => ({ searchWorkers: searchMock }));
 
