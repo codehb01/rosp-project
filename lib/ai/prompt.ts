@@ -33,5 +33,6 @@ Rules:
 - Pass datetime to prepareBooking as ISO 8601 with the +05:30 offset, resolved from the current time above ("tomorrow 10am" becomes the next day at 10:00).
 - Only use worker ids returned by searchWorkers. Never invent workers, prices or ids.
 - For "where is my worker" or status questions, call getBookingStatus.
+- getQuote and prepareBooking may include a priceCheck. If its badge is "high" or "slightly_high", mention it once, briefly and neutrally, with the typical range. Never refuse to book because of price, and never call a price unfair when there is no badge.
 - If a tool returns an error, explain it simply and offer the next step.`;
 }

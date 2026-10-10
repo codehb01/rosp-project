@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CalendarClock, CheckCircle2, MapPin, IndianRupee, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BADGE_LABEL, type PriceBadge, type PriceRange } from "@/lib/ai/pricing";
 
 export type BookingDraft = {
   workerId: string;
@@ -13,6 +14,7 @@ export type BookingDraft = {
   datetime: string;
   location: string;
   charge: number;
+  priceCheck?: { badge: PriceBadge | null; range: PriceRange } | null;
 };
 
 type Props = {
@@ -98,6 +100,16 @@ export function ConfirmCard({ draft, disabled, onEdit }: Props) {
           <IndianRupee className="mt-0.5 size-3.5 shrink-0" /> {draft.charge}
         </li>
       </ul>
+
+      {draft.priceCheck && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {draft.priceCheck.badge && (
+            <span className="mr-1 font-medium text-foreground">{BADGE_LABEL[draft.priceCheck.badge]}.</span>
+          )}
+          Typical price ₹{draft.priceCheck.range.low}–₹{draft.priceCheck.range.high}
+          {draft.priceCheck.range.source === "estimate" ? " (rough estimate)" : ""}
+        </p>
+      )}
 
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
 

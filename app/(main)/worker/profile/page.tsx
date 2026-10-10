@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useSaveWorkerProfileMutation } from "@/hooks/api/use-worker";
 import { Card } from "@/components/ui/card";
+import { PriceInsight } from "@/components/price-insight";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -838,6 +839,8 @@ export default function WorkerProfilePage() {
                       )}
                     </Card>
                   </div>
+
+                  <PriceInsight skill={profile.skilledIn?.[0]} city={profile.city} />
 
                   {/* Qualification & Experience */}
                   <div className="grid md:grid-cols-2 gap-6">

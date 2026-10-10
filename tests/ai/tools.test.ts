@@ -10,6 +10,9 @@ const prismaMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
+const priceMock = vi.hoisted(() => ({ getPriceCheck: vi.fn().mockResolvedValue(null) }));
+vi.mock("@/lib/ai/market-price", () => priceMock);
+
 vi.mock("@/lib/ai/review-summary", () => ({
   withReviewSummaries: async (workers: unknown[]) => workers,
 }));
@@ -93,6 +96,49 @@ describe("prepareBooking", () => {
     prismaMock.user.findFirst.mockResolvedValue(null);
     await run(createChatTools(user).prepareBooking, input);
     expect(prismaMock.user.findFirst.mock.calls[0][0].where).toMatchObject({ role: "WORKER" });
+  });
+});
+
+describe("price check", () => {
+  const check = {
+    badge: "high",
+    range: { low: 400, median: 500, high: 600, sampleSize: 9, source: "market" },
+  };
+
+  it("prepareBooking includes the price check in the draft", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({ id: "w1", name: "Ramesh" });
+    priceMock.getPriceCheck.mockResolvedValue(check);
+
+    const out = await run(createChatTools(user).prepareBooking, {
+      workerId: "w1",
+      description: "Fix leaking tap",
+      datetime: future(),
+      location: "12 MG Road, Pune",
+      charge: 2000,
+    });
+
+    expect(priceMock.getPriceCheck).toHaveBeenCalledWith("w1", 2000);
+    expect(out.draft.priceCheck).toEqual(check);
+  });
+
+  it("getQuote includes the price check for the quoted amount", async () => {
+    prismaMock.workerProfile.findFirst.mockResolvedValue({ hourlyRate: 300, minimumFee: null });
+    priceMock.getPriceCheck.mockResolvedValue(check);
+
+    const out = await run(createChatTools(user).getQuote, { workerId: "w1", hours: 2 });
+
+    expect(priceMock.getPriceCheck).toHaveBeenCalledWith("w1", 600);
+    expect(out).toMatchObject({ amount: 600, priceCheck: check });
+  });
+
+  it("getQuote still returns the typical range when the worker has no rate", async () => {
+    prismaMock.workerProfile.findFirst.mockResolvedValue({ hourlyRate: null, minimumFee: null });
+    priceMock.getPriceCheck.mockResolvedValue({ ...check, badge: null });
+
+    const out = await run(createChatTools(user).getQuote, { workerId: "w1" });
+
+    expect(out.amount).toBeNull();
+    expect(out.priceCheck.range.median).toBe(500);
   });
 });
 

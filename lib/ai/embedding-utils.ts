@@ -16,7 +16,7 @@ export type WorkerTextInput = {
 };
 
 // Skills are sometimes stored as a JSON string inside the array.
-function flatten(values: string[] | null | undefined): string[] {
+export function flatten(values: string[] | null | undefined): string[] {
   const out: string[] = [];
   for (const raw of values ?? []) {
     const v = raw?.trim();

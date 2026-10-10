@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from "@/lib/api-auth";
 import { searchWorkersTool } from "@/lib/ai/tools/search-workers";
 import { getQuoteTool } from "@/lib/ai/tools/get-quote";
 import { bookingDraftSchema, checkDraftDate } from "@/lib/ai/booking-draft";
+import { getPriceCheck } from "@/lib/ai/market-price";
 
 /**
  * Builds the chat tools for one request. Tools that touch user data close over
@@ -53,6 +54,8 @@ export function createChatTools(user: AuthenticatedUser) {
         });
         if (!worker) return { ok: false as const, error: "Worker not found" };
 
+        const priceCheck = await getPriceCheck(worker.id, draft.charge);
+
         return {
           ok: true as const,
           draft: {
@@ -63,6 +66,7 @@ export function createChatTools(user: AuthenticatedUser) {
             datetime: date.datetime,
             location: draft.location,
             charge: draft.charge,
+            priceCheck,
           },
         };
       },
