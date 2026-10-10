@@ -52,6 +52,17 @@ model WorkerProfile {
   longitude       Float?
   previousWorks   PreviousWork[]
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  embedding       WorkerEmbedding?
+}
+
+// Semantic-search vector for a worker. Written and queried with raw SQL
+// (pgvector); see lib/ai/embeddings.ts. Requires the "vector" extension.
+model WorkerEmbedding {
+  workerProfileId String        @id
+  embedding       Unsupported("vector(1024)")
+  contentHash     String
+  updatedAt       DateTime      @default(now())
+  workerProfile   WorkerProfile @relation(fields: [workerProfileId], references: [id], onDelete: Cascade)
 }
 
 model PreviousWork {
