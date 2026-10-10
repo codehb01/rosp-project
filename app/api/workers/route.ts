@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { sendSuccess, sendError, withErrorHandling } from "@/lib/api-response";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { searchWorkers } from "@/lib/services/worker-service";
+import { withReviewSummaries } from "@/lib/ai/review-summary";
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   const rl = checkRateLimit(req);
@@ -23,5 +24,8 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
 
   const result = await searchWorkers({ q, category, limit, sort, lat, lng });
 
-  return sendSuccess(result);
+  return sendSuccess({
+    ...result,
+    workers: await withReviewSummaries(result.workers),
+  });
 });

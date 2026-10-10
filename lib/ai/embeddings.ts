@@ -1,9 +1,9 @@
 import "server-only";
-import { after } from "next/server";
 import { embed } from "ai";
 import prisma from "@/lib/prisma";
 import { getAiConfig } from "@/lib/ai/config";
 import { getEmbeddingModel } from "@/lib/ai/provider";
+import { runInBackground } from "@/lib/ai/background";
 import {
   EMBEDDING_DIMENSIONS,
   buildWorkerText,
@@ -66,25 +66,8 @@ export async function refreshWorkerEmbedding(workerProfileId: string): Promise<v
   `;
 }
 
-/**
- * Refreshes the embedding after the response is sent. Never throws: search
- * falls back to keywords, so a failed refresh must not break a profile save.
- */
+/** Refreshes the embedding after the response is sent. Never throws. */
 export function scheduleEmbeddingRefresh(workerProfileId: string): void {
   if (!isEmbeddingEnabled()) return;
-
-  const task = async () => {
-    try {
-      await refreshWorkerEmbedding(workerProfileId);
-    } catch (error) {
-      console.error("[ai] embedding refresh failed", error);
-    }
-  };
-
-  try {
-    after(task);
-  } catch {
-    // Outside a request scope (scripts, tests): run it directly.
-    void task();
-  }
+  runInBackground("embedding refresh", () => refreshWorkerEmbedding(workerProfileId));
 }

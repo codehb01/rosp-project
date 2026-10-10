@@ -2,6 +2,7 @@
 
 import { MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ReviewSummary } from "@/components/review-summary";
 
 export type ChatWorker = {
   id: string;
@@ -14,6 +15,7 @@ export type ChatWorker = {
   profilePic: string | null;
   rating: number | null;
   reviewCount: number;
+  reviewSummary?: { summary: string; tags: string[] } | null;
 };
 
 type Props = {
@@ -65,6 +67,9 @@ export function WorkerCard({ worker, disabled, onSelect }: Props) {
             </span>
           )}
           {price && <span>{price}</span>}
+        </div>
+        <div className="mt-1">
+          <ReviewSummary summary={worker.reviewSummary} compact />
         </div>
       </div>
 

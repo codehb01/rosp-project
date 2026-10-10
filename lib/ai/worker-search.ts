@@ -2,6 +2,7 @@ import "server-only";
 import prisma from "@/lib/prisma";
 import { searchWorkers as keywordSearch } from "@/lib/services/worker-service";
 import { semanticWorkerIds } from "@/lib/ai/vector-search";
+import { withReviewSummaries } from "@/lib/ai/review-summary";
 
 type Candidate = {
   id: string;
@@ -28,6 +29,7 @@ export type FoundWorker = {
   profilePic: string | null;
   rating: number | null;
   reviewCount: number;
+  reviewSummary: { summary: string; tags: string[] } | null;
 };
 
 const normalize = (s: string) => s.toLowerCase().trim();
@@ -97,7 +99,9 @@ export async function findWorkers(opts: {
   });
   const ratingByWorker = new Map(ratings.map((r) => [r.workerId, r]));
 
-  return matches.map((w) => {
+  const withSummaries = await withReviewSummaries(matches);
+
+  return withSummaries.map((w) => {
     const r = ratingByWorker.get(w.id);
     return {
       id: w.id,
@@ -110,6 +114,7 @@ export async function findWorkers(opts: {
       profilePic: w.workerProfile?.profilePic ?? null,
       rating: r?._avg.rating ? Math.round(r._avg.rating * 10) / 10 : null,
       reviewCount: r?._count.rating ?? 0,
+      reviewSummary: w.reviewSummary ?? null,
     };
   });
 }

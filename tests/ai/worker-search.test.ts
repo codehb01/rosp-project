@@ -8,6 +8,10 @@ const prismaMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
+vi.mock("@/lib/ai/review-summary", () => ({
+  withReviewSummaries: async (workers: unknown[]) => workers,
+}));
+
 const keywordMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/services/worker-service", () => ({ searchWorkers: keywordMock }));
 

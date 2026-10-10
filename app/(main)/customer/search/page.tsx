@@ -14,6 +14,7 @@ import { useLocation } from "@/hooks/use-location";
 import { toast } from "sonner";
 import Link from "next/link";
 import BookWorkerButton from "@/components/book-worker-button";
+import { ReviewSummary } from "@/components/review-summary";
 import SkillBadge from "@/components/ui/skill-badge";
 
 const MapPreview = dynamic(() => import("@/components/ui/map-preview"), {
@@ -40,6 +41,8 @@ type Worker = {
   role: string;
   // distance may be provided by the API (DB-side Haversine) as distanceKm or distance_km
   distanceKm?: number | null;
+  // AI-written review summary, present only when AI is enabled and the worker has enough reviews
+  reviewSummary?: { summary: string; tags: string[] } | null;
   workerProfile: {
     skilledIn: string[] | null;
     city: string | null;
@@ -588,6 +591,7 @@ function SearchPageContent() {
                                         {w.workerProfile?.yearsExperience ?? 0}{" "}
                                         years experience
                                       </div>
+                                      <ReviewSummary summary={w.reviewSummary} compact />
                                     </div>
                                   </div>
 
@@ -724,6 +728,12 @@ function SearchPageContent() {
                                             No skills listed
                                           </span>
                                         )}
+                                      </div>
+                                      <div className="mt-1.5">
+                                        <ReviewSummary
+                                          summary={worker.reviewSummary}
+                                          compact={viewMode !== "grid"}
+                                        />
                                       </div>
                                     </div>
 
