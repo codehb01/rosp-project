@@ -13,7 +13,6 @@ import { guardAiRoute } from "@/lib/ai/guard";
 import { getChatModel } from "@/lib/ai/provider";
 import { createChatTools } from "@/lib/ai/tools";
 import { buildSystemPrompt } from "@/lib/ai/prompt";
-import { classifyAiError, describeAiError } from "@/lib/ai/errors";
 
 // Streaming responses may run up to 60 seconds (the Vercel Hobby maximum).
 export const maxDuration = 60;
@@ -66,15 +65,9 @@ async function handleChat(req: NextRequest) {
     stopWhen: isStepCount(5),
     maxOutputTokens: 700,
     abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
-    // The stream hides model errors from the console, so log the real cause here.
-    onError: ({ error }) => console.error("[ai] model error:", describeAiError(error)),
   });
 
   return createUIMessageStreamResponse({
-    stream: toUIMessageStream({
-      stream: result.stream,
-      // Send only a short code to the browser, never provider details.
-      onError: (error) => classifyAiError(error),
-    }),
+    stream: toUIMessageStream({ stream: result.stream }),
   });
 }
