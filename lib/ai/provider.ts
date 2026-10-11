@@ -56,15 +56,35 @@ export function withFallbackFetch(
   };
 }
 
+/**
+ * Adds `reasoning: { enabled: false }` to chat requests so reasoning models
+ * (e.g. on OpenRouter) answer directly instead of "thinking" for several
+ * seconds first. Only for providers that understand that field.
+ */
+export function withReasoningOff(baseFetch: FetchFn = fetch): FetchFn {
+  return async (input, init) => {
+    if (typeof init?.body === "string" && urlOf(input).endsWith("/chat/completions")) {
+      try {
+        const body = JSON.parse(init.body);
+        return baseFetch(input, { ...init, body: JSON.stringify({ ...body, reasoning: { enabled: false } }) });
+      } catch {
+        // Not JSON: send unchanged.
+      }
+    }
+    return baseFetch(input, init);
+  };
+}
+
 export function getChatModel() {
-  const { llm, fallback } = getAiConfig();
+  const { llm, fallback, disableReasoning } = getAiConfig();
   if (!llm) throw new Error("AI model is not configured");
 
+  const withFallback = withFallbackFetch(llm, fallback);
   const provider = createOpenAICompatible({
     name: "llm",
     baseURL: llm.baseURL,
     apiKey: llm.apiKey,
-    fetch: withFallbackFetch(llm, fallback),
+    fetch: disableReasoning ? withReasoningOff(withFallback) : withFallback,
   });
   return provider.chatModel(llm.model);
 }

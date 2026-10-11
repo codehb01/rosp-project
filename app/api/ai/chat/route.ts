@@ -14,8 +14,12 @@ import { getChatModel } from "@/lib/ai/provider";
 import { createChatTools } from "@/lib/ai/tools";
 import { buildSystemPrompt } from "@/lib/ai/prompt";
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30;
+// Streaming responses may run up to 60 seconds (the Vercel Hobby maximum).
+export const maxDuration = 60;
+
+// Stop a bit before the platform limit so the client gets a clean error
+// instead of a reset connection.
+const MODEL_TIMEOUT_MS = 55_000;
 
 const MAX_MESSAGES = 30;
 const MAX_BODY_BYTES = 100_000;
@@ -60,6 +64,7 @@ async function handleChat(req: NextRequest) {
     tools: createChatTools(user),
     stopWhen: isStepCount(5),
     maxOutputTokens: 700,
+    abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
   });
 
   return createUIMessageStreamResponse({
