@@ -9,6 +9,8 @@ import { MessageCircle, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WorkerCard, type ChatWorker } from "@/components/ai-chat/worker-card";
 import { ConfirmCard, type BookingDraft } from "@/components/ai-chat/confirm-card";
+import { TypingStatus } from "@/components/ai-chat/typing-status";
+import { getActivityLabel } from "@/components/ai-chat/activity";
 
 const SUGGESTIONS = ["Find a plumber near me", "Book an electrician tomorrow", "Where is my worker?"];
 
@@ -121,7 +123,7 @@ export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [transport] = useState(() => new DefaultChatTransport({ api: "/api/ai/chat" }));
-  const { messages, sendMessage, status, error } = useChat({ transport });
+  const { messages, sendMessage, regenerate, status, error } = useChat({ transport });
   const endRef = useRef<HTMLDivElement>(null);
 
   const busy = status === "submitted" || status === "streaming";
@@ -141,6 +143,7 @@ export default function ChatWidget() {
   };
 
   const lastId = messages[messages.length - 1]?.id;
+  const activity = getActivityLabel(messages, busy);
 
   return (
     <>
@@ -223,13 +226,20 @@ export default function ChatWidget() {
               </div>
             ))}
 
-            {busy && <p className="text-xs text-muted-foreground">Thinking…</p>}
+            {activity && <TypingStatus label={activity} />}
             {status === "error" && (
-              <p className="text-xs text-destructive">
-                {error?.message?.includes("403")
-                  ? "The assistant is available for customer accounts."
-                  : "Something went wrong. Please try again."}
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-destructive">
+                  {error?.message?.includes("403")
+                    ? "The assistant is available for customer accounts."
+                    : "The assistant took too long or is unavailable right now."}
+                </p>
+                {!error?.message?.includes("403") && (
+                  <Button size="sm" variant="outline" onClick={() => regenerate()}>
+                    Try again
+                  </Button>
+                )}
+              </div>
             )}
             <div ref={endRef} />
           </div>
