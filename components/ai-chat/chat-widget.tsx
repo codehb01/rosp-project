@@ -11,6 +11,7 @@ import { WorkerCard, type ChatWorker } from "@/components/ai-chat/worker-card";
 import { ConfirmCard, type BookingDraft } from "@/components/ai-chat/confirm-card";
 import { TypingStatus } from "@/components/ai-chat/typing-status";
 import { getActivityLabel } from "@/components/ai-chat/activity";
+import { friendlyChatError } from "@/components/ai-chat/errors";
 
 const SUGGESTIONS = ["Find a plumber near me", "Book an electrician tomorrow", "Where is my worker?"];
 
@@ -144,6 +145,7 @@ export default function ChatWidget() {
 
   const lastId = messages[messages.length - 1]?.id;
   const activity = getActivityLabel(messages, busy);
+  const chatError = friendlyChatError(error?.message);
 
   return (
     <>
@@ -229,12 +231,8 @@ export default function ChatWidget() {
             {activity && <TypingStatus label={activity} />}
             {status === "error" && (
               <div className="space-y-2">
-                <p className="text-xs text-destructive">
-                  {error?.message?.includes("403")
-                    ? "The assistant is available for customer accounts."
-                    : "The assistant took too long or is unavailable right now."}
-                </p>
-                {!error?.message?.includes("403") && (
+                <p className="text-xs text-destructive">{chatError.text}</p>
+                {chatError.canRetry && (
                   <Button size="sm" variant="outline" onClick={() => regenerate()}>
                     Try again
                   </Button>
