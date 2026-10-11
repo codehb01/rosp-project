@@ -3,8 +3,10 @@ import prisma from "@/lib/prisma";
 import { embedText, isEmbeddingEnabled } from "@/lib/ai/embeddings";
 import { toVectorLiteral } from "@/lib/ai/embedding-utils";
 
-// Cosine similarity below this is treated as unrelated. Tune against real data.
-export const MIN_SIMILARITY = 0.3;
+// Cosine similarity below this is treated as unrelated. Measured with bge-m3 on
+// a small sample: relevant Hindi/Marathi/English matches scored 0.49-0.60, an
+// unrelated query scored up to 0.35. Re-check against real profiles.
+export const MIN_SIMILARITY = 0.4;
 
 /**
  * Returns worker user ids ranked by semantic similarity to the query.
