@@ -24,6 +24,7 @@
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Environment Setup](#environment-setup)
+- [AI Assistant (optional)](#ai-assistant-optional)
 - [API Endpoints](#api-endpoints)
 - [Development](#development)
 - [Deployment](#deployment)
@@ -223,6 +224,41 @@ All variables are validated on startup — missing or invalid values fail fast w
 
 ---
 
+## AI Assistant (optional)
+
+An optional, open-model AI layer. It is **off by default**; with `AI_ENABLED` unset the app behaves exactly as before and none of the AI code runs.
+
+| Feature | What it does |
+|---|---|
+| **Booking chat** | Customers describe what they need ("plumber in Pune tomorrow 10am"); the assistant finds workers, fills in address and price, and shows a confirmation card. The model cannot create bookings: **Confirm Booking** posts to the normal `/api/jobs`. Payment stays in the existing completion flow. |
+| **Semantic search** | Chat search understands meaning and Hindi/Marathi via pgvector embeddings, with keyword search as the fallback. |
+| **Review summaries** | "Customers say: ..." line and tags on worker cards, written after a new review is saved (needs 5+ reviews, 2+ comments). |
+| **Smart pricing** | Typical price range from completed jobs, shown to workers, and a "Fair / High / Below market" badge to customers. Falls back to a rough estimate (never a badge) until there is enough data. |
+
+### Enable it
+
+1. Apply the migrations (they add two tables, `WorkerEmbedding` and `WorkerReviewSummary`):
+   ```bash
+   npx prisma migrate deploy
+   ```
+   The embedding migration runs `CREATE EXTENSION vector`, so the database must support **pgvector** (Neon and Supabase do). If you set up with `prisma db push`, enable the extension first (`CREATE EXTENSION IF NOT EXISTS vector;`).
+2. Set the variables from `.env.example`: `AI_ENABLED=true` plus `LLM_*` (any OpenAI-compatible endpoint, for example Groq or OpenRouter). The model must support **tool calling**. `LLM_FALLBACK_*` is optional and used when the primary is rate-limited or down.
+3. For semantic search also set `EMBEDDING_*` (dimension must be **1024**, e.g. `BAAI/bge-m3`), then embed existing workers once:
+   ```bash
+   npm run ai:backfill-embeddings
+   ```
+4. Open the app signed in as a customer; the chat button appears at the bottom right.
+
+Switching model or provider means changing the env values only. Changing the embedding model to a different dimension needs a new migration and a re-run of the backfill.
+
+### Notes
+
+- Everything AI lives in `lib/ai/`, `app/api/ai/`, `app/api/pricing/` and `components/ai-chat/`. Existing features only gained small hooks (re-embed on profile save, summary after a review, extra fields on `/api/workers`).
+- Every AI call is per-user rate limited. The limiter is in memory, so it is per server instance.
+- Failures degrade quietly: if the model, embeddings or a table is unavailable, search and booking work as before.
+
+---
+
 ## API Endpoints
 
 All endpoints require Clerk authentication via `Authorization: Bearer <token>` header.
@@ -240,6 +276,9 @@ All endpoints require Clerk authentication via `Authorization: Bearer <token>` h
 | PATCH | `/api/customer/profile` | Update customer address |
 | POST | `/api/reviews` | Submit job review |
 | GET | `/health` | Liveness probe |
+| POST | `/api/ai/chat` | Booking assistant (streaming, customers only, needs `AI_ENABLED`) |
+| GET | `/api/ai/health` | Checks the configured AI model responds |
+| GET | `/api/pricing` | Typical price for a worker or skill (`?workerId=` or `?skill=&city=`) |
 
 ---
 
@@ -291,6 +330,7 @@ npx prisma studio
 - [ ] Razorpay live (or test) keys set
 - [ ] Cloudinary API keys valid
 - [ ] GitHub Actions CI passing (lint, build, type check)
+- [ ] (If enabling AI) pgvector available, AI migrations applied, `LLM_*` / `EMBEDDING_*` set, backfill run
 
 ---
 

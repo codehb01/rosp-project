@@ -2,9 +2,10 @@
 import "server-only";
 import prisma from "@/lib/prisma";
 import { distanceKm } from "@/lib/location";
+import { scheduleEmbeddingRefresh } from "@/lib/ai/embeddings";
 
 export async function updateWorkerProfile(workerProfileId: string, data: any) {
-  return await prisma.workerProfile.update({
+  const updated = await prisma.workerProfile.update({
     where: { id: workerProfileId },
     data: {
       bio: data.bio ?? undefined,
@@ -32,6 +33,9 @@ export async function updateWorkerProfile(workerProfileId: string, data: any) {
       },
     },
   });
+
+  scheduleEmbeddingRefresh(updated.id);
+  return updated;
 }
 
 export async function getWorkerJobs(workerId: string) {

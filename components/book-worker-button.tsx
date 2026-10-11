@@ -22,6 +22,7 @@ import {
 import { X as XIcon, AlertCircle as AlertCircleIcon } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import ClickSpark from "@/components/ClickSpark";
+import { PriceInsight } from "@/components/price-insight";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -600,6 +601,7 @@ export default function BookWorkerButton({ workerId, className }: Props) {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
                       You can negotiate the final price with the worker
                     </p>
+                    <PriceInsight workerId={workerId} charge={Number(booking.charge) || undefined} />
                   </div>
 
                   {/* Review Summary */}
