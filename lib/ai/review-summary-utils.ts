@@ -39,7 +39,6 @@ export function buildReviewPrompt(reviews: ReviewInput[]): string {
 const UNSAFE = /https?:|www\.|\d{8,}/i;
 
 function clean(text: string): string {
-  // eslint-disable-next-line no-control-regex
   return text.replace(/[\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
