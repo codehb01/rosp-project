@@ -8,6 +8,8 @@ const aiEnvSchema = z.object({
   LLM_BASE_URL: z.string().url().optional(),
   LLM_API_KEY: z.string().optional(),
   LLM_MODEL: z.string().optional(),
+  // "true" asks OpenRouter-style reasoning models to answer without thinking first (much faster).
+  LLM_DISABLE_REASONING: z.string().optional(),
 
   LLM_FALLBACK_BASE_URL: z.string().url().optional(),
   LLM_FALLBACK_API_KEY: z.string().optional(),
@@ -25,6 +27,7 @@ export type AiConfig = {
   llm: Endpoint | null;
   fallback: Endpoint | null;
   embedding: Endpoint | null;
+  disableReasoning: boolean;
 };
 
 // Treat empty strings (e.g. `LLM_API_KEY=`) as unset.
@@ -50,7 +53,7 @@ export function getAiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
   const parsed = aiEnvSchema.safeParse(clean(env));
   if (!parsed.success) {
     console.error("[ai] Invalid AI environment variables", parsed.error.flatten().fieldErrors);
-    return { enabled: false, llm: null, fallback: null, embedding: null };
+    return { enabled: false, llm: null, fallback: null, embedding: null, disableReasoning: false };
   }
   const e = parsed.data;
   const llm = endpoint(e.LLM_BASE_URL, e.LLM_API_KEY, e.LLM_MODEL);
@@ -65,6 +68,7 @@ export function getAiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
       e.LLM_FALLBACK_MODEL
     ),
     embedding: endpoint(e.EMBEDDING_BASE_URL, e.EMBEDDING_API_KEY, e.EMBEDDING_MODEL),
+    disableReasoning: e.LLM_DISABLE_REASONING === "true",
   };
 }
 

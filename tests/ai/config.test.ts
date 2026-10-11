@@ -59,4 +59,10 @@ describe("getAiConfig", () => {
     const cfg = getAiConfig(env({ ...base, LLM_BASE_URL: "nope", AI_ENABLED: "true" }));
     expect(cfg.enabled).toBe(false);
   });
+
+  it("keeps reasoning on unless LLM_DISABLE_REASONING is exactly true", () => {
+    expect(getAiConfig(env({ ...base, AI_ENABLED: "true" })).disableReasoning).toBe(false);
+    expect(getAiConfig(env({ ...base, LLM_DISABLE_REASONING: "yes" })).disableReasoning).toBe(false);
+    expect(getAiConfig(env({ ...base, LLM_DISABLE_REASONING: "true" })).disableReasoning).toBe(true);
+  });
 });
