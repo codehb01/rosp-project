@@ -21,6 +21,9 @@ import {
   CheckCircle,
 } from "lucide-react";
 
+// Lists workers from the database, so render per request rather than at build time.
+export const dynamic = "force-dynamic";
+
 const categories = [
   {
     key: "plumber",
