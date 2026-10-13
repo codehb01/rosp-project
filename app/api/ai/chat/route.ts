@@ -13,6 +13,7 @@ import { guardAiRoute } from "@/lib/ai/guard";
 import { getChatModel } from "@/lib/ai/provider";
 import { createChatTools } from "@/lib/ai/tools";
 import { buildSystemPrompt } from "@/lib/ai/prompt";
+import { stripReasoning } from "@/lib/ai/messages";
 
 // Streaming responses may run up to 60 seconds (the Vercel Hobby maximum).
 export const maxDuration = 60;
@@ -60,7 +61,8 @@ async function handleChat(req: NextRequest) {
   const result = streamText({
     model: getChatModel(),
     instructions: buildSystemPrompt({ customerName: user.name }),
-    messages: await convertToModelMessages(messages),
+    // Drop hidden reasoning so providers that reject it do not 400 on follow-ups.
+    messages: await convertToModelMessages(stripReasoning(messages)),
     tools: createChatTools(user),
     stopWhen: isStepCount(5),
     maxOutputTokens: 700,
@@ -68,6 +70,7 @@ async function handleChat(req: NextRequest) {
   });
 
   return createUIMessageStreamResponse({
-    stream: toUIMessageStream({ stream: result.stream }),
+    // Do not send the model's hidden reasoning to the browser.
+    stream: toUIMessageStream({ stream: result.stream, sendReasoning: false }),
   });
 }
