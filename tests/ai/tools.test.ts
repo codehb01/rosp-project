@@ -200,3 +200,47 @@ describe("searchWorkers", () => {
     expect(out.workers).toHaveLength(2);
   });
 });
+
+describe("searchWorkers default city", () => {
+  const w = (id: string, city: string) => ({
+    id,
+    name: id,
+    workerProfile: { skilledIn: ["plumber"], city, availableAreas: [] },
+  });
+  const noCityUser = { ...user, customerProfile: null } as unknown as AuthenticatedUser;
+
+  beforeEach(() => prismaMock.review.groupBy.mockResolvedValue([]));
+
+  it("uses the customer's saved city when none is named", async () => {
+    searchMock.mockResolvedValue({ workers: [w("pune-1", "Pune"), w("delhi-1", "Delhi")] });
+    const out = await run(createChatTools(user).searchWorkers, { skill: "plumber" });
+    expect(out.workers.map((x: { id: string }) => x.id)).toEqual(["pune-1"]);
+    expect(out.noneInThatCity).toBeUndefined();
+  });
+
+  it("lets a city the customer names override the saved one", async () => {
+    searchMock.mockResolvedValue({ workers: [w("pune-1", "Pune"), w("delhi-1", "Delhi")] });
+    const out = await run(createChatTools(user).searchWorkers, { skill: "plumber", city: "Delhi" });
+    expect(out.workers.map((x: { id: string }) => x.id)).toEqual(["delhi-1"]);
+  });
+
+  it("widens to all cities, and says so, when nobody is in the saved city", async () => {
+    searchMock.mockResolvedValue({ workers: [w("delhi-1", "Delhi")] });
+    const out = await run(createChatTools(user).searchWorkers, { skill: "plumber" });
+    expect(out.workers.map((x: { id: string }) => x.id)).toEqual(["delhi-1"]);
+    expect(out).toMatchObject({ noneInThatCity: true, searchedCity: "Pune" });
+  });
+
+  it("returns an empty list when nobody matches anywhere", async () => {
+    searchMock.mockResolvedValue({ workers: [] });
+    expect(await run(createChatTools(user).searchWorkers, { skill: "astronaut" })).toEqual({ workers: [] });
+  });
+
+  it("does not filter by city when the customer has no saved city and named none", async () => {
+    searchMock.mockResolvedValue({ workers: [w("pune-1", "Pune"), w("delhi-1", "Delhi")] });
+    const out = await run(createChatTools(noCityUser).searchWorkers, { skill: "plumber" });
+    expect(out.workers).toHaveLength(2);
+    expect(out.noneInThatCity).toBeUndefined();
+  });
+});
+

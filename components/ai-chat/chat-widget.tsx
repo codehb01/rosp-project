@@ -11,8 +11,28 @@ import { WorkerCard, type ChatWorker } from "@/components/ai-chat/worker-card";
 import { ConfirmCard, type BookingDraft } from "@/components/ai-chat/confirm-card";
 import { TypingStatus } from "@/components/ai-chat/typing-status";
 import { getActivityLabel } from "@/components/ai-chat/activity";
+import {
+  EarningsCard,
+  JobActionCard,
+  JobList,
+  type Earnings,
+  type JobActionDraft,
+  type WorkerJob,
+} from "@/components/ai-chat/worker-cards";
+import { useAssistantRole } from "@/components/ai-chat/use-role";
 
-const SUGGESTIONS = ["Find a plumber near me", "Book an electrician tomorrow", "Where is my worker?"];
+const MODES = {
+  CUSTOMER: {
+    subtitle: "Find and book workers",
+    intro: "Hi! Tell me what you need, for example \"plumber in Pune tomorrow 10am\". You can write in English, Hindi or Marathi.",
+    suggestions: ["Find a plumber near me", "Book an electrician tomorrow", "Where is my worker?"],
+  },
+  WORKER: {
+    subtitle: "Your jobs, earnings and rates",
+    intro: "Hi! I can show your jobs, accept or decline requests, check your earnings and suggest rates. You can write in English, Hindi or Marathi.",
+    suggestions: ["Show my pending jobs", "How much did I earn this month?", "Suggest a fair rate for my work"],
+  },
+} as const;
 
 type ToolPart = { type: string; state?: string; toolCallId?: string; output?: unknown };
 
@@ -112,6 +132,27 @@ function ToolOutput({
       );
     }
 
+    case "tool-getMyJobs": {
+      const jobs = (out.jobs as WorkerJob[]) ?? [];
+      return (
+        <JobList
+          jobs={jobs}
+          disabled={busy || !isLast}
+          onAction={(job, action) =>
+            send(`${action === "ACCEPT" ? "Accept" : "Decline"} the job "${job.description}"`)
+          }
+        />
+      );
+    }
+
+    case "tool-getEarnings":
+      return <EarningsCard earnings={out as unknown as Earnings} />;
+
+    case "tool-prepareJobAction": {
+      if (out.ok !== true) return null;
+      return <JobActionCard draft={out.draft as JobActionDraft} disabled={busy} />;
+    }
+
     default:
       return null;
   }
@@ -119,7 +160,8 @@ function ToolOutput({
 
 export default function ChatWidget() {
   const pathname = usePathname();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
+  const role = useAssistantRole(isSignedIn ? userId : null);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [transport] = useState(() => new DefaultChatTransport({ api: "/api/ai/chat" }));
@@ -132,9 +174,11 @@ export default function ChatWidget() {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, status, open]);
 
-  // Chat booking is for signed-in customers; keep it off worker and onboarding screens.
+  // The assistant is for signed-in customers and workers who finished onboarding.
   if (!isSignedIn) return null;
-  if (pathname?.startsWith("/worker") || pathname?.startsWith("/onboarding")) return null;
+  if (pathname?.startsWith("/onboarding")) return null;
+  if (!role) return null;
+  const mode = MODES[role];
 
   const send = (text: string) => {
     const trimmed = text.trim();
@@ -163,7 +207,7 @@ export default function ChatWidget() {
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div>
               <p className="text-sm font-semibold">RozgaarSetu Assistant</p>
-              <p className="text-xs text-muted-foreground">Find and book workers</p>
+              <p className="text-xs text-muted-foreground">{mode.subtitle}</p>
             </div>
             <Button size="icon" variant="ghost" aria-label="Close assistant" onClick={() => setOpen(false)}>
               <X />
@@ -173,12 +217,9 @@ export default function ChatWidget() {
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
             {messages.length === 0 && (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Hi! Tell me what you need, for example &quot;plumber in Pune tomorrow 10am&quot;. You can write in
-                  English, Hindi or Marathi.
-                </p>
+                <p className="text-sm text-muted-foreground">{mode.intro}</p>
                 <div className="flex flex-wrap gap-2">
-                  {SUGGESTIONS.map((s) => (
+                  {mode.suggestions.map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -231,7 +272,7 @@ export default function ChatWidget() {
               <div className="space-y-2">
                 <p className="text-xs text-destructive">
                   {error?.message?.includes("403")
-                    ? "The assistant is available for customer accounts."
+                    ? "The assistant is available for customer and worker accounts."
                     : "The assistant took too long or is unavailable right now."}
                 </p>
                 {!error?.message?.includes("403") && (

@@ -25,6 +25,14 @@ describe("getActivityLabel", () => {
     );
   });
 
+  it("names the worker tools too", () => {
+    const label = (type: string) => getActivityLabel([user, assistant({ type, state: "input-available" })], true);
+    expect(label("tool-getMyJobs")).toBe("Looking up your jobs");
+    expect(label("tool-getEarnings")).toBe("Calculating your earnings");
+    expect(label("tool-getPriceGuidance")).toBe("Checking typical prices");
+    expect(label("tool-prepareJobAction")).toBe("Preparing the job action");
+  });
+
   it("falls back to a generic label for an unknown tool", () => {
     expect(getActivityLabel([user, assistant({ type: "tool-somethingNew", state: "input-available" })], true)).toBe(
       "Working on it"

@@ -11,8 +11,8 @@ import {
 import { sendError } from "@/lib/api-response";
 import { guardAiRoute } from "@/lib/ai/guard";
 import { getChatModel } from "@/lib/ai/provider";
-import { createChatTools } from "@/lib/ai/tools";
-import { buildSystemPrompt } from "@/lib/ai/prompt";
+import { getAssistant } from "@/lib/ai/assistant";
+import { stripReasoning } from "@/lib/ai/messages";
 
 // Streaming responses may run up to 60 seconds (the Vercel Hobby maximum).
 export const maxDuration = 60;
@@ -34,8 +34,14 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleChat(req: NextRequest) {
-  const { user, response } = await guardAiRoute(req, { role: "CUSTOMER", limit: 20 });
+  const { user, response } = await guardAiRoute(req, { limit: 20 });
   if (response || !user) return response ?? sendError("Unauthorized", "UNAUTHORIZED", 401);
+
+  // Prompt and tools depend on the role; other accounts (e.g. not onboarded) are refused.
+  const assistant = getAssistant(user);
+  if (!assistant) {
+    return sendError("The assistant is available for customer and worker accounts", "FORBIDDEN", 403);
+  }
 
   const raw = await req.text();
   if (raw.length > MAX_BODY_BYTES) {
@@ -59,15 +65,17 @@ async function handleChat(req: NextRequest) {
 
   const result = streamText({
     model: getChatModel(),
-    instructions: buildSystemPrompt({ customerName: user.name }),
-    messages: await convertToModelMessages(messages),
-    tools: createChatTools(user),
+    instructions: assistant.instructions,
+    // Drop hidden reasoning so providers that reject it do not 400 on follow-ups.
+    messages: await convertToModelMessages(stripReasoning(messages)),
+    tools: assistant.tools,
     stopWhen: isStepCount(5),
     maxOutputTokens: 700,
     abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
   });
 
   return createUIMessageStreamResponse({
-    stream: toUIMessageStream({ stream: result.stream }),
+    // Do not send the model's hidden reasoning to the browser.
+    stream: toUIMessageStream({ stream: result.stream, sendReasoning: false }),
   });
 }

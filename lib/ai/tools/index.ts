@@ -3,7 +3,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import type { AuthenticatedUser } from "@/lib/api-auth";
-import { searchWorkersTool } from "@/lib/ai/tools/search-workers";
+import { createSearchWorkersTool } from "@/lib/ai/tools/search-workers";
 import { getQuoteTool } from "@/lib/ai/tools/get-quote";
 import { bookingDraftSchema, checkDraftDate } from "@/lib/ai/booking-draft";
 import { getPriceCheck } from "@/lib/ai/market-price";
@@ -17,7 +17,7 @@ import { getPriceCheck } from "@/lib/ai/market-price";
  */
 export function createChatTools(user: AuthenticatedUser) {
   return {
-    searchWorkers: searchWorkersTool,
+    searchWorkers: createSearchWorkersTool({ defaultCity: user.customerProfile?.city }),
     getQuote: getQuoteTool,
 
     getCustomerAddress: tool({
