@@ -1,6 +1,7 @@
 import "server-only";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { getAiConfig, type Endpoint } from "@/lib/ai/config";
+import { stripReasoningFromRequestBody } from "@/lib/ai/messages";
 
 type FetchFn = typeof fetch;
 
@@ -75,6 +76,21 @@ export function withReasoningOff(baseFetch: FetchFn = fetch): FetchFn {
   };
 }
 
+/**
+ * Strips the model's hidden reasoning out of every outgoing chat request, so a
+ * tool call followed by an answer (two steps in one reply) does not fail on
+ * providers that reject `reasoning_content` in the history.
+ */
+export function withoutReasoningInput(baseFetch: FetchFn = fetch): FetchFn {
+  return async (input, init) => {
+    if (typeof init?.body === "string" && urlOf(input).endsWith("/chat/completions")) {
+      const body = stripReasoningFromRequestBody(init.body);
+      if (body !== init.body) return baseFetch(input, { ...init, body });
+    }
+    return baseFetch(input, init);
+  };
+}
+
 export function getChatModel() {
   const { llm, fallback, disableReasoning } = getAiConfig();
   if (!llm) throw new Error("AI model is not configured");
@@ -84,7 +100,8 @@ export function getChatModel() {
     name: "llm",
     baseURL: llm.baseURL,
     apiKey: llm.apiKey,
-    fetch: disableReasoning ? withReasoningOff(withFallback) : withFallback,
+    // Outermost, so the primary and the fallback both get a cleaned request.
+    fetch: withoutReasoningInput(disableReasoning ? withReasoningOff(withFallback) : withFallback),
   });
   return provider.chatModel(llm.model);
 }
