@@ -1,4 +1,4 @@
-// Decides what to tell the customer while the assistant is working.
+// Decides what to tell the user while the assistant is working.
 // Pure functions, so the wording rules are easy to test.
 
 type Part = { type: string; state?: string; text?: string };
@@ -10,6 +10,10 @@ const TOOL_LABELS: Record<string, string> = {
   "tool-getCustomerAddress": "Looking up your saved address",
   "tool-prepareBooking": "Preparing your booking",
   "tool-getBookingStatus": "Checking your bookings",
+  "tool-getMyJobs": "Looking up your jobs",
+  "tool-getEarnings": "Calculating your earnings",
+  "tool-getPriceGuidance": "Checking typical prices",
+  "tool-prepareJobAction": "Preparing the job action",
 };
 
 const DONE_STATES = new Set(["output-available", "output-error", "output-denied"]);
