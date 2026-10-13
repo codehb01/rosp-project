@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { withFallbackFetch, withReasoningOff } from "@/lib/ai/provider";
+import { withFallbackFetch, withReasoningOff, withoutReasoningInput } from "@/lib/ai/provider";
 
 const primary = { baseURL: "https://p.test/v1", apiKey: "pk", model: "pm" };
 const fallback = { baseURL: "https://f.test/v1", apiKey: "fk", model: "fm" };
@@ -94,3 +94,48 @@ describe("withReasoningOff", () => {
     expect(second).toMatchObject({ model: "fm", reasoning: { enabled: false } });
   });
 });
+
+describe("withoutReasoningInput", () => {
+  const withThinking = JSON.stringify({
+    model: "m",
+    messages: [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "", tool_calls: [{ id: "c1" }], reasoning_content: "thinking" },
+    ],
+  });
+
+  it("removes reasoning_content from chat requests", async () => {
+    const base = vi.fn().mockResolvedValue(new Response("ok"));
+    await withoutReasoningInput(base)("https://p.test/v1/chat/completions", { method: "POST", body: withThinking });
+    const sent = JSON.parse(base.mock.calls[0][1].body);
+    expect(sent.messages[1]).toEqual({ role: "assistant", content: "", tool_calls: [{ id: "c1" }] });
+  });
+
+  it("leaves other endpoints untouched", async () => {
+    const base = vi.fn().mockResolvedValue(new Response("ok"));
+    const init = { method: "POST", body: withThinking };
+    await withoutReasoningInput(base)("https://p.test/v1/embeddings", init);
+    expect(base.mock.calls[0][1]).toBe(init);
+  });
+
+  it("sends the original init when there is nothing to clean", async () => {
+    const base = vi.fn().mockResolvedValue(new Response("ok"));
+    const init = { method: "POST", body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) };
+    await withoutReasoningInput(base)("https://p.test/v1/chat/completions", init);
+    expect(base.mock.calls[0][1]).toBe(init);
+  });
+
+  it("cleans the request the fallback receives too when it is the outermost wrapper", async () => {
+    const base = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("limit", { status: 429 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    const f = withoutReasoningInput(withFallbackFetch(primary, fallback, base));
+
+    expect((await f(URL_, { method: "POST", headers: {}, body: withThinking })).status).toBe(200);
+    for (const call of base.mock.calls) {
+      expect(JSON.parse(call[1].body).messages[1]).not.toHaveProperty("reasoning_content");
+    }
+  });
+});
+
