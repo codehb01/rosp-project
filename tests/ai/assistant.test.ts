@@ -68,3 +68,27 @@ describe("worker system prompt", () => {
     expect(prompt).not.toContain("prepareBooking");
   });
 });
+
+describe("customer system prompt: search first", () => {
+  const prompt = buildSystemPrompt({ customerName: "Asha", now: new Date("2030-01-01T00:00:00Z") });
+
+  it("searches as soon as a trade is named, before asking for date or time", () => {
+    expect(prompt).toContain("call searchWorkers right away");
+    expect(prompt).toContain("Do not ask for a date, time or job details first");
+  });
+
+  it("asks for the date and time only after a worker is picked", () => {
+    expect(prompt.indexOf("After they pick a worker")).toBeGreaterThan(prompt.indexOf("call searchWorkers right away"));
+    expect(prompt).toContain("ask only for what is still missing");
+  });
+
+  it("tells the model not to repeat itself and to use the saved city", () => {
+    expect(prompt).toContain("never ask the same question twice");
+    expect(prompt).toContain("the app uses their saved city");
+  });
+
+  it("explains how to handle the no-one-in-that-city result", () => {
+    expect(prompt).toContain("noneInThatCity");
+  });
+});
+
